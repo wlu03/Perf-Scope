@@ -3,6 +3,7 @@ import tomllib
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+from sys import float_info
 
 
 class ConfigError(ValueError):
@@ -40,6 +41,7 @@ class Suite:
     iterations: int
     timeout_s: int
     source: str
+    slowdown_margin: float
     cases: tuple[Case, ...]
 
 
@@ -59,8 +61,13 @@ def _integer(value: object, label: str, minimum: int) -> int:
 
 
 def _identifier(value: object, label: str) -> str:
-    if not isinstance(value, str) or re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_-]*", value) is None:
-        raise ConfigError(f"{label} must start with a letter or digit and use letters, digits, _ or -")
+    if (
+        not isinstance(value, str)
+        or re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_-]*", value) is None
+    ):
+        raise ConfigError(
+            f"{label} must start with a letter or digit and use letters, digits, _ or -"
+        )
     return value
 
 
@@ -74,7 +81,9 @@ def _variant(value: object, label: str) -> Variant:
         or not all(isinstance(arg, str) and "\x00" not in arg for arg in command)
         or not command[0].strip()
     ):
-        raise ConfigError(f"{label}.command must be an argument array with a program name")
+        raise ConfigError(
+            f"{label}.command must be an argument array with a program name"
+        )
     return Variant(identifier, tuple(command))
 
 
@@ -91,7 +100,9 @@ def _case(value: object, index: int) -> Case:
     try:
         metric = Metric(table.get("metric", Metric.LATENCY))
     except ValueError as error:
-        raise ConfigError(f"{label}.metric must be one of {', '.join(Metric)}") from error
+        raise ConfigError(
+            f"{label}.metric must be one of {', '.join(Metric)}"
+        ) from error
     baseline = _variant(table.get("baseline"), f"{label}.baseline")
     candidate = _variant(table.get("candidate"), f"{label}.candidate")
     if baseline.id == candidate.id:
@@ -99,8 +110,12 @@ def _case(value: object, index: int) -> Case:
     return Case(identifier, workload, dimensions, dtype, metric, baseline, candidate)
 
 
-def _suite(value: object) -> Suite:
-    table = _table(value, "suite", "version seed pairs warmups iterations timeout_s source cases")
+def parse_suite(value: object) -> Suite:
+    table = _table(
+        value,
+        "suite",
+        "version seed pairs warmups iterations timeout_s source slowdown_margin cases",
+    )
     if _integer(table.get("version"), "version", 1) != 1:
         raise ConfigError("only suite version 1 is supported")
     seed = _integer(table.get("seed", 0), "seed", 0)
@@ -111,18 +126,23 @@ def _suite(value: object) -> Suite:
     source = table.get("source", "measured")
     if source not in ("measured", "fixture"):
         raise ConfigError("source must be measured or fixture")
+    margin = table.get("slowdown_margin", 0.05)
+    if type(margin) not in (int, float) or not 0 <= margin <= float_info.max:
+        raise ConfigError("slowdown_margin must be a finite nonnegative fraction")
     entries = table.get("cases")
     if not isinstance(entries, list) or not entries:
         raise ConfigError("cases must contain at least one case")
     cases = tuple(_case(entry, i) for i, entry in enumerate(entries))
     if len({case.id for case in cases}) != len(cases):
         raise ConfigError("case IDs must be unique")
-    return Suite(seed, pairs, warmups, iterations, timeout, source, cases)
+    return Suite(
+        seed, pairs, warmups, iterations, timeout, source, float(margin), cases
+    )
 
 
 def load_suite(path: Path) -> Suite:
     try:
         with path.open("rb") as stream:
-            return _suite(tomllib.load(stream))
+            return parse_suite(tomllib.load(stream))
     except (ConfigError, OSError, UnicodeError, tomllib.TOMLDecodeError) as error:
         raise ConfigError(f"{path}: {error}") from error

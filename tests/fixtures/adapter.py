@@ -23,7 +23,7 @@ else:
             {
                 "device": "fixture-device",
                 "correct": args.mode != "incorrect",
-                "metrics": {"latency_ms": 1.5},
+                "metrics": {"latency_ms": 1.8 if args.mode == "slow" else 1.5},
                 "args": vars(args),
             }
         )
