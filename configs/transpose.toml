@@ -1,0 +1,31 @@
+version = 1
+seed = 42
+pairs = 20
+warmups = 8
+iterations = 30
+
+[[cases]]
+id = "transpose-aligned"
+workload = "transpose"
+shape = [4096, 4096]
+
+[cases.baseline]
+id = "naive"
+command = ["./build/cuda/perf-scope-cuda", "transpose", "naive"]
+
+[cases.candidate]
+id = "tiled"
+command = ["./build/cuda/perf-scope-cuda", "transpose", "tiled"]
+
+[[cases]]
+id = "transpose-partial-tiles"
+workload = "transpose"
+shape = [2049, 2053]
+
+[cases.baseline]
+id = "naive"
+command = ["./build/cuda/perf-scope-cuda", "transpose", "naive"]
+
+[cases.candidate]
+id = "tiled"
+command = ["./build/cuda/perf-scope-cuda", "transpose", "tiled"]
