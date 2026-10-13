@@ -26,6 +26,8 @@ struct Measurement {
     double latency_ms;
     double logical_bytes;
     bool correct;
+    double flops{};
+    int cublas_version{};
 };
 
 inline void cuda_check(cudaError_t status, std::string_view operation) {
@@ -95,5 +97,7 @@ inline std::vector<float> input_values(std::size_t count, std::uint64_t seed) {
 }
 
 Measurement transpose(const Options& options, const cudaDeviceProp& properties);
+Measurement gemm(const Options& options, const cudaDeviceProp& properties);
+Measurement triad(const Options& options, const cudaDeviceProp& properties);
 
 }

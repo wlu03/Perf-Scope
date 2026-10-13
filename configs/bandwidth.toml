@@ -1,0 +1,19 @@
+version = 1
+seed = 42
+pairs = 20
+warmups = 8
+iterations = 30
+
+[[cases]]
+id = "device-memory-triad"
+workload = "triad"
+shape = [33554432]
+metric = "bandwidth_gb_s"
+
+[cases.baseline]
+id = "trial-a"
+command = ["./build/cuda/perf-scope-cuda", "triad", "streaming"]
+
+[cases.candidate]
+id = "trial-b"
+command = ["./build/cuda/perf-scope-cuda", "triad", "streaming"]

@@ -49,7 +49,7 @@ Options parse(int count, char** argv) {
         return field->second;
     };
     if (get("--dtype") != "fp32") {
-        throw std::invalid_argument("CUDA transpose requires fp32");
+        throw std::invalid_argument("CUDA benchmarks require fp32");
     }
     Options options{
         argv[1], argv[2], dimensions(get("--shape")),
@@ -57,13 +57,23 @@ Options parse(int count, char** argv) {
         integer(get("--warmups"), "--warmups", 0),
         integer(get("--iterations"), "--iterations", 1),
     };
-    if (options.workload != "transpose" || (options.variant != "naive" && options.variant != "tiled")) {
-        throw std::invalid_argument("expected transpose naive or transpose tiled");
+    if (options.workload == "transpose") {
+        if (options.shape.size() == 2 && (options.variant == "naive" || options.variant == "tiled")) {
+            return options;
+        }
+        throw std::invalid_argument("transpose requires naive or tiled and shape rows,columns");
     }
-    if (options.shape.size() != 2) {
-        throw std::invalid_argument("transpose shape requires rows,columns");
+    if (options.workload == "gemm") {
+        if (options.shape.size() == 3 &&
+            (options.variant == "naive" || options.variant == "tiled" || options.variant == "cublas")) {
+            return options;
+        }
+        throw std::invalid_argument("gemm requires naive, tiled, or cublas and shape M,N,K");
     }
-    return options;
+    if (options.workload == "triad" && options.variant == "streaming" && options.shape.size() == 1) {
+        return options;
+    }
+    throw std::invalid_argument("expected transpose, gemm, or triad streaming");
 }
 
 std::string device_id(const cudaUUID_t& uuid) {
@@ -78,9 +88,20 @@ std::string device_id(const cudaUUID_t& uuid) {
     return id.str();
 }
 
+Measurement benchmark(const Options& options, const cudaDeviceProp& properties) {
+    if (options.workload == "transpose") {
+        return transpose(options, properties);
+    }
+    if (options.workload == "gemm") {
+        return gemm(options, properties);
+    }
+    return triad(options, properties);
+}
+
 int run(int count, char** argv) {
     if (count == 2 && std::string_view(argv[1]) == "--help") {
-        std::cout << "perf-scope-cuda transpose {naive|tiled} --shape ROWS,COLS "
+        std::cout << "perf-scope-cuda transpose {naive|tiled} | gemm {naive|tiled|cublas} | triad streaming\n"
+                     "--shape DIMS "
                      "--dtype fp32 --seed SEED --warmups N --iterations N\n";
         return 0;
     }
@@ -91,16 +112,27 @@ int run(int count, char** argv) {
     cuda_check(cudaGetDeviceProperties(&properties, device), "read device properties");
     cuda_check(cudaDriverGetVersion(&driver), "read CUDA driver version");
     cuda_check(cudaRuntimeGetVersion(&runtime), "read CUDA runtime version");
-    const Measurement result = transpose(options, properties);
+    const Measurement result = benchmark(options, properties);
     std::cout << std::setprecision(10) << std::boolalpha
               << "{\"device\":" << std::quoted(device_id(properties.uuid))
               << ",\"correct\":" << result.correct
-              << ",\"metrics\":{\"latency_ms\":" << result.latency_ms
-              << ",\"bandwidth_gb_s\":" << result.logical_bytes / (1.0e6 * result.latency_ms)
-              << "},\"cuda\":{\"name\":" << std::quoted(properties.name)
+              << ",\"metrics\":{\"latency_ms\":" << result.latency_ms;
+    if (result.logical_bytes > 0) {
+        std::cout << ",\"bandwidth_gb_s\":" << result.logical_bytes / (1.0e6 * result.latency_ms);
+    }
+    if (result.flops > 0) {
+        std::cout << ",\"gflops\":" << result.flops / (1.0e6 * result.latency_ms);
+    }
+    std::cout << "},\"logical_bytes\":" << result.logical_bytes << ",\"flops\":" << result.flops
+              << ",\"cuda\":{\"name\":" << std::quoted(properties.name)
               << ",\"major\":" << properties.major << ",\"minor\":" << properties.minor
               << ",\"l2_bytes\":" << properties.l2CacheSize
-              << ",\"driver\":" << driver << ",\"runtime\":" << runtime
+              << ",\"driver\":" << driver << ",\"runtime\":" << runtime;
+    if (result.cublas_version > 0) {
+        std::cout << ",\"cublas_version\":" << result.cublas_version
+                  << ",\"cublas_compute\":\"CUBLAS_COMPUTE_32F_PEDANTIC\"";
+    }
+    std::cout
               << "},\"timing_scope\":\"cuda_event\"}\n";
     return 0;
 }

@@ -1,0 +1,44 @@
+version = 1
+seed = 42
+pairs = 20
+warmups = 8
+iterations = 30
+
+[[cases]]
+id = "gemm-aligned"
+workload = "gemm"
+shape = [1024, 1024, 1024]
+
+[cases.baseline]
+id = "naive"
+command = ["./build/cuda/perf-scope-cuda", "gemm", "naive"]
+
+[cases.candidate]
+id = "tiled"
+command = ["./build/cuda/perf-scope-cuda", "gemm", "tiled"]
+
+[[cases]]
+id = "gemm-partial-tiles"
+workload = "gemm"
+shape = [513, 769, 259]
+
+[cases.baseline]
+id = "naive"
+command = ["./build/cuda/perf-scope-cuda", "gemm", "naive"]
+
+[cases.candidate]
+id = "tiled"
+command = ["./build/cuda/perf-scope-cuda", "gemm", "tiled"]
+
+[[cases]]
+id = "gemm-cublas-reference"
+workload = "gemm"
+shape = [1024, 1024, 1024]
+
+[cases.baseline]
+id = "tiled"
+command = ["./build/cuda/perf-scope-cuda", "gemm", "tiled"]
+
+[cases.candidate]
+id = "cublas"
+command = ["./build/cuda/perf-scope-cuda", "gemm", "cublas"]
