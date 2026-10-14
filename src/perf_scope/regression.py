@@ -140,7 +140,7 @@ def compare_case(suite: Suite, case: Case, rows: list[dict]) -> Comparison:
     )
 
 
-def analyze_run(directory: Path) -> tuple[dict, list[Comparison]]:
+def read_run(directory: Path) -> tuple[dict, Suite, dict[str, list[dict]]]:
     manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
     if (
         not isinstance(manifest, dict)
@@ -160,6 +160,11 @@ def analyze_run(directory: Path) -> tuple[dict, list[Comparison]]:
             if not isinstance(case, str) or case not in by_case:
                 raise ValueError("measurement has an unknown case")
             by_case[case].append(row)
+    return manifest, suite, by_case
+
+
+def analyze_run(directory: Path) -> tuple[dict, list[Comparison]]:
+    manifest, suite, by_case = read_run(directory)
     results = [compare_case(suite, case, by_case[case.id]) for case in suite.cases]
     write_json(
         directory / "comparisons.json",

@@ -1,3 +1,4 @@
+import json
 from html import escape
 from pathlib import Path
 
@@ -6,6 +7,40 @@ from perf_scope.regression import Comparison
 
 def _number(value: float | None, format_spec: str = ".6g") -> str:
     return "—" if value is None else format(value, format_spec)
+
+
+def _profile_section(directory: Path) -> str:
+    sections = []
+    source = directory / "profiles.json"
+    if source.is_file():
+        profiles = json.loads(source.read_text(encoding="utf-8"))
+        entries = []
+        for row in profiles["profiles"]:
+            label = f"{row['case']} {row.get('variant', '')}".strip()
+            detail = row.get("reason", row["status"])
+            entries.append(f"<li>{escape(label)} · {escape(detail)}</li>")
+        for row in profiles["diagnoses"]:
+            evidence = row.get("evidence", {})
+            detail = ", ".join(
+                f"{key.replace('_', ' ')} {value:g}" for key, value in evidence.items()
+            )
+            text = f"{row['case']} · {row['cause']}" + (
+                f" ({detail})" if detail else ""
+            )
+            entries.append(f"<li>{escape(text)}</li>")
+        sections.append(
+            "<h2>Profiler evidence</h2><ul>" + "".join(entries) + "</ul>"
+            '<p><a href="profiles.json">Counter records and logs</a></p>'
+        )
+    if (directory / "roofline.png").is_file():
+        sections.append(
+            '<h2>GEMM roofline</h2><img src="roofline.png" '
+            'alt="Scalar FP32 DRAM roofline with achieved GEMM throughput" '
+            'style="max-width:100%"><p><a href="roofline.json">Roofline data</a></p>'
+        )
+    elif (directory / "roofline.json").is_file():
+        sections.append('<p><a href="roofline.json">Roofline data availability</a></p>')
+    return "".join(sections)
 
 
 def render_report(
@@ -68,6 +103,7 @@ th, td {{ padding: .5rem; border-bottom: 1px solid #aaa; }}
 <table><thead><tr>{headers}</tr></thead><tbody>{"".join(rows)}</tbody></table>
 <p><a href="manifest.json">Manifest</a> · <a href="measurements.jsonl">Measurements</a>
  · <a href="comparisons.json">Decisions</a></p>
+{_profile_section(directory)}
 </html>
 """
     output = directory / "report.html"

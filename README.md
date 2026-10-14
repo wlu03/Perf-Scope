@@ -38,3 +38,18 @@ perf-scope run configs/bandwidth.toml
 The two FP32 variants share their inputs and launch geometry. The tiled variant uses a padded shared-memory tile for coalesced reads and writes. CUDA events measure the average launch latency for each block. The executable validates the transpose and reports effective bandwidth from one logical matrix read and write.
 
 GEMM compares naïve and tiled FP32 kernels with a cuBLAS reference using pedantic FP32 compute. GFLOP/s counts $2MNK$ operations. The reference checks up to 512 entries against a double-precision CPU calculation with absolute tolerance $10^{-3}$ and relative tolerance $10^{-4}$. The vector triad reads two arrays and writes one. Use a triad working set larger than the device's recorded L2 cache for bandwidth calibration.
+
+## Profiling and roofline
+
+With Nsight Compute on PATH, confirmed CUDA regressions trigger a separate counter pass. The report links the raw exports and describes available evidence. Nsight counter permissions come from the GPU host.
+
+Install the plotting extra and pass a hardware reference for the scalar FP32 peak to generate a GEMM roofline.
+
+~~~bash
+python -m pip install '.[plot]'
+bandwidth_run=$(perf-scope run configs/bandwidth.toml --profile off)
+perf-scope run configs/gemm.toml --profile all --bandwidth-run "$bandwidth_run" \
+  --fp32-peak-gflops "$peak_gflops" --peak-source "$peak_reference"
+~~~
+
+The roofline uses useful work divided by Nsight DRAM bytes for intensity, and useful work divided by profiled duration for throughput. The bandwidth ceiling comes from the measured triad on the same GPU.

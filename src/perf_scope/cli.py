@@ -1,10 +1,13 @@
 import argparse
+import math
 import sys
 from pathlib import Path
 
 from perf_scope.config import load_suite
+from perf_scope.profiling import profile_run
 from perf_scope.regression import analyze_run
 from perf_scope.report import render_report
+from perf_scope.roofline import write_roofline
 from perf_scope.runner import run_suite
 
 
@@ -17,6 +20,12 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("suite", type=Path)
     run.add_argument("--output", type=Path, default=Path("runs"))
     run.add_argument("--fail-on-regression", action="store_true")
+    run.add_argument(
+        "--profile", choices=("regressions", "all", "off"), default="regressions"
+    )
+    run.add_argument("--bandwidth-run", type=Path)
+    run.add_argument("--fp32-peak-gflops", type=float)
+    run.add_argument("--peak-source")
     compare = commands.add_parser(
         "compare", help="recompute comparisons from a completed run"
     )
@@ -30,12 +39,35 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Validated suite {args.suite}")
             return 0
         if args.command == "run":
+            ceiling = (args.bandwidth_run, args.fp32_peak_gflops, args.peak_source)
+            if any(value is not None for value in ceiling) and (
+                not all(ceiling)
+                or not math.isfinite(args.fp32_peak_gflops)
+                or args.fp32_peak_gflops <= 0
+                or args.profile == "off"
+            ):
+                raise ValueError(
+                    "roofline requires profiling, bandwidth run, positive FP32 peak, and peak source"
+                )
             suite = load_suite(args.suite)
             directory, _ = run_suite(suite, args.suite, args.output)
         else:
             directory = args.directory
         manifest, decisions = analyze_run(directory)
-        render_report(directory, manifest, decisions)
+        try:
+            if args.command == "run":
+                profiles = profile_run(suite, directory, decisions, args.profile)
+                if args.bandwidth_run is not None:
+                    write_roofline(
+                        directory,
+                        suite,
+                        profiles["profiles"],
+                        args.bandwidth_run,
+                        args.fp32_peak_gflops,
+                        args.peak_source,
+                    )
+        finally:
+            render_report(directory, manifest, decisions)
     except (ValueError, OSError) as error:
         print(error, file=sys.stderr)
         return 2
