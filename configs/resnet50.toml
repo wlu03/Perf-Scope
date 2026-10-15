@@ -1,0 +1,45 @@
+version = 1
+seed = 42
+pairs = 20
+warmups = 10
+iterations = 25
+timeout_s = 900
+
+[[cases]]
+id = "resnet50-batch-1"
+workload = "resnet50"
+shape = [1]
+
+[cases.baseline]
+id = "eager"
+command = ["python", "-m", "perf_scope.resnet", "eager"]
+
+[cases.candidate]
+id = "inductor"
+command = ["python", "-m", "perf_scope.resnet", "inductor"]
+
+[[cases]]
+id = "resnet50-batch-8"
+workload = "resnet50"
+shape = [8]
+
+[cases.baseline]
+id = "eager"
+command = ["python", "-m", "perf_scope.resnet", "eager"]
+
+[cases.candidate]
+id = "inductor"
+command = ["python", "-m", "perf_scope.resnet", "inductor"]
+
+[[cases]]
+id = "resnet50-batch-32"
+workload = "resnet50"
+shape = [32]
+
+[cases.baseline]
+id = "eager"
+command = ["python", "-m", "perf_scope.resnet", "eager"]
+
+[cases.candidate]
+id = "inductor"
+command = ["python", "-m", "perf_scope.resnet", "inductor"]

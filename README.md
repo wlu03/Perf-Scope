@@ -53,3 +53,14 @@ perf-scope run configs/gemm.toml --profile all --bandwidth-run "$bandwidth_run" 
 ~~~
 
 The roofline uses useful work divided by Nsight DRAM bytes for intensity, and useful work divided by profiled duration for throughput. The bandwidth ceiling comes from the measured triad on the same GPU.
+
+## ResNet-50 inference
+
+On a Linux CUDA host, install matching PyTorch and torchvision wheels into the active environment.
+
+~~~bash
+python -m pip install torch==2.7.1 torchvision==0.22.1 --index-url https://download.pytorch.org/whl/cu128
+perf-scope run configs/resnet50.toml --profile off
+~~~
+
+Eager and TorchInductor use the torchvision IMAGENET1K_V2 checkpoint and seeded GPU-resident FP32 inputs. The adapter checks Inductor outputs against eager, separately records the synchronized first call, and reports warmed device latency, images per second, and peak allocated memory. The first checkpoint load can download weights. Inductor shares the on-disk compiler cache by default. Add `--cold-cache` to the Inductor variant's arguments to isolate it per process.
