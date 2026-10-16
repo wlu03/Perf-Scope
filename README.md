@@ -64,3 +64,13 @@ perf-scope run configs/resnet50.toml --profile off
 ~~~
 
 Eager and TorchInductor use the torchvision IMAGENET1K_V2 checkpoint and seeded GPU-resident FP32 inputs. The adapter checks Inductor outputs against eager, separately records the synchronized first call, and reports warmed device latency, images per second, and peak allocated memory. The first checkpoint load can download weights. Inductor shares the on-disk compiler cache by default. Add `--cold-cache` to the Inductor variant's arguments to isolate it per process.
+
+## NVIDIA STREAM
+
+Place the NVIDIA HPC Benchmarks 26.02.01 package directory on PATH on a supported Linux GPU host. The suite runs the FP32 TRIAD benchmark as an A/A comparison. Each trial checks process success, the reported GPU index and array size, and the bandwidth row. The report uses the median rate across repeated launcher calls and retains their original logs.
+
+~~~bash
+perf-scope run configs/stream.toml --profile off
+~~~
+
+[Package and hardware support](https://docs.nvidia.com/nvidia-hpc-benchmarks/index.html#system-support) · [NVIDIA STREAM arguments](https://docs.nvidia.com/nvidia-hpc-benchmarks/STREAM_Benchmark.html)

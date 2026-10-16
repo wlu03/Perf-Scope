@@ -1,0 +1,20 @@
+version = 1
+seed = 42
+pairs = 12
+warmups = 1
+iterations = 3
+timeout_s = 600
+
+[[cases]]
+id = "nvidia-stream-fp32-triad"
+workload = "nvidia-stream"
+shape = [33554432]
+metric = "bandwidth_gb_s"
+
+[cases.baseline]
+id = "trial-a"
+command = ["python", "-m", "perf_scope.stream", "--release", "26.02.01"]
+
+[cases.candidate]
+id = "trial-b"
+command = ["python", "-m", "perf_scope.stream", "--release", "26.02.01"]
