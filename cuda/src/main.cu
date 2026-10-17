@@ -73,7 +73,11 @@ Options parse(int count, char** argv) {
     if (options.workload == "triad" && options.variant == "streaming" && options.shape.size() == 1) {
         return options;
     }
-    throw std::invalid_argument("expected transpose, gemm, or triad streaming");
+    if (options.workload == "softmax" && options.shape.size() == 2 &&
+        (options.variant == "fused" || options.variant == "multi-pass")) {
+        return options;
+    }
+    throw std::invalid_argument("expected transpose, gemm, triad streaming, or softmax");
 }
 
 std::string device_id(const cudaUUID_t& uuid) {
@@ -95,12 +99,16 @@ Measurement benchmark(const Options& options, const cudaDeviceProp& properties) 
     if (options.workload == "gemm") {
         return gemm(options, properties);
     }
+    if (options.workload == "softmax") {
+        return softmax(options, properties);
+    }
     return triad(options, properties);
 }
 
 int run(int count, char** argv) {
     if (count == 2 && std::string_view(argv[1]) == "--help") {
-        std::cout << "perf-scope-cuda transpose {naive|tiled} | gemm {naive|tiled|cublas} | triad streaming\n"
+        std::cout << "perf-scope-cuda transpose {naive|tiled} | gemm {naive|tiled|cublas} | "
+                     "triad streaming | softmax {fused|multi-pass}\n"
                      "--shape DIMS "
                      "--dtype fp32 --seed SEED --warmups N --iterations N\n";
         return 0;

@@ -99,5 +99,6 @@ inline std::vector<float> input_values(std::size_t count, std::uint64_t seed) {
 Measurement transpose(const Options& options, const cudaDeviceProp& properties);
 Measurement gemm(const Options& options, const cudaDeviceProp& properties);
 Measurement triad(const Options& options, const cudaDeviceProp& properties);
+Measurement softmax(const Options& options, const cudaDeviceProp& properties);
 
 }

@@ -5,7 +5,7 @@ endif()
 project(PerfScopeCuda LANGUAGES CUDA)
 
 find_package(CUDAToolkit REQUIRED)
-add_executable(perf-scope-cuda src/main.cu src/transpose.cu src/gemm.cu src/triad.cu)
+add_executable(perf-scope-cuda src/main.cu src/transpose.cu src/gemm.cu src/triad.cu src/softmax.cu)
 target_compile_features(perf-scope-cuda PRIVATE cuda_std_17)
 target_link_libraries(perf-scope-cuda PRIVATE CUDA::cublas)
 
@@ -52,4 +52,18 @@ if(BUILD_TESTING)
       --shape 10003 --dtype fp32 --seed 42 --warmups 2 --iterations 5
   )
   set_tests_properties(triad_partial_block PROPERTIES LABELS gpu PASS_REGULAR_EXPRESSION "\"correct\":true")
+  foreach(variant fused multi-pass)
+    foreach(shape 11,1 17,259)
+      string(REPLACE "," "x" shape_label "${shape}")
+      add_test(
+        NAME softmax_${variant}_${shape_label}
+        COMMAND perf-scope-cuda softmax ${variant}
+          --shape ${shape} --dtype fp32 --seed 42 --warmups 2 --iterations 5
+      )
+      set_tests_properties(
+        softmax_${variant}_${shape_label}
+        PROPERTIES LABELS gpu PASS_REGULAR_EXPRESSION "\"correct\":true"
+      )
+    endforeach()
+  endforeach()
 endif()

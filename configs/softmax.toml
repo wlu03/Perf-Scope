@@ -1,0 +1,18 @@
+version = 1
+seed = 42
+pairs = 20
+warmups = 8
+iterations = 30
+
+[[cases]]
+id = "softmax-unfusing"
+workload = "softmax"
+shape = [128, 259]
+
+[cases.baseline]
+id = "fused"
+command = ["./build/cuda/perf-scope-cuda", "softmax", "fused"]
+
+[cases.candidate]
+id = "multi-pass"
+command = ["./build/cuda/perf-scope-cuda", "softmax", "multi-pass"]

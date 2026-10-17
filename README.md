@@ -33,6 +33,7 @@ ctest --test-dir build/cuda -L gpu --output-on-failure
 perf-scope run configs/transpose.toml
 perf-scope run configs/gemm.toml
 perf-scope run configs/bandwidth.toml
+perf-scope run configs/softmax.toml
 ~~~
 
 The two FP32 variants share their inputs and launch geometry. The tiled variant uses a padded shared-memory tile for coalesced reads and writes. CUDA events measure the average launch latency for each block. The executable validates the transpose and reports effective bandwidth from one logical matrix read and write.
@@ -53,6 +54,8 @@ perf-scope run configs/gemm.toml --profile all --bandwidth-run "$bandwidth_run" 
 ~~~
 
 The roofline uses useful work divided by Nsight DRAM bytes for intensity, and useful work divided by profiled duration for throughput. The bandwidth ceiling comes from the measured triad on the same GPU.
+
+The softmax suite compares the fused kernel with a three-stage implementation. Both subtract the row maximum and validate against a double-precision CPU reference. If the gate confirms an unfusing slowdown, Nsight Systems traces a single invocation of each variant and the report shows recorded launch counts.
 
 ## ResNet-50 inference
 
