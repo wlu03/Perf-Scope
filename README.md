@@ -77,3 +77,14 @@ perf-scope run configs/stream.toml --profile off
 ~~~
 
 [Package and hardware support](https://docs.nvidia.com/nvidia-hpc-benchmarks/index.html#system-support) · [NVIDIA STREAM arguments](https://docs.nvidia.com/nvidia-hpc-benchmarks/STREAM_Benchmark.html)
+
+## Budgeted regression evaluation
+
+Replay three policies using independently recorded reference and observation runs from the same suite and GPU. Use more pairs in the reference run for labels. The observation run provides disjoint screening and confirmation windows and can capture profile costs with `--profile all`.
+
+~~~bash
+perf-scope evaluate "$reference_run" "$observation_run" --budget-s "$budget_seconds" \
+  --output runs/evaluation.json
+~~~
+
+Exhaustive testing confirms every case. The fixed-budget policy confirms cases in seeded random order. The adaptive policy spends up to 25% of its budget on screening and ranks cases by declared priority, observed slowdown, and screening variability. All three use the same fixed-size confirmation window and charge recorded profiler time after detections. The JSON reports recall, false positives, detection time, diagnosis accuracy, and replayed subprocess wall time.

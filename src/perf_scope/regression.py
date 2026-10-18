@@ -94,6 +94,20 @@ def _interval(values: list[float], seed: str) -> tuple[float, float]:
     return _quantile(bootstrap, 0.025), _quantile(bootstrap, 0.975)
 
 
+def paired_ratios(
+    case: Case, baseline: list[float], candidate: list[float]
+) -> list[float]:
+    numerators, denominators = (
+        (candidate, baseline)
+        if case.metric == Metric.LATENCY
+        else (baseline, candidate)
+    )
+    ratios = [a / b for a, b in zip(numerators, denominators, strict=True)]
+    if not all(math.isfinite(value) for value in ratios):
+        raise ValueError("slowdown is outside numeric range")
+    return ratios
+
+
 def compare_case(suite: Suite, case: Case, rows: list[dict]) -> Comparison:
     identity = {
         "case": case.id,
@@ -104,12 +118,7 @@ def compare_case(suite: Suite, case: Case, rows: list[dict]) -> Comparison:
     }
     try:
         baseline, candidate, device = _paired_values(suite, case, rows)
-        numerators, denominators = (candidate, baseline)
-        if case.metric != Metric.LATENCY:
-            numerators, denominators = baseline, candidate
-        values = [a / b for a, b in zip(numerators, denominators, strict=True)]
-        if not all(math.isfinite(value) for value in values):
-            raise ValueError("slowdown is outside numeric range")
+        values = paired_ratios(case, baseline, candidate)
     except (OverflowError, ValueError) as error:
         return Comparison(**identity, status="invalid", reason=str(error))
 

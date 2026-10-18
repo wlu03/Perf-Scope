@@ -1,4 +1,5 @@
 import argparse
+import json
 import math
 import sys
 from pathlib import Path
@@ -9,6 +10,7 @@ from perf_scope.regression import analyze_run
 from perf_scope.report import render_report
 from perf_scope.roofline import write_roofline
 from perf_scope.runner import run_suite
+from perf_scope.scheduler import evaluate
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -31,12 +33,46 @@ def main(argv: list[str] | None = None) -> int:
     )
     compare.add_argument("directory", type=Path)
     compare.add_argument("--fail-on-regression", action="store_true")
+    replay = commands.add_parser(
+        "evaluate", help="replay GPU measurement policies from two runs"
+    )
+    replay.add_argument("reference", type=Path)
+    replay.add_argument("observations", type=Path)
+    replay.add_argument("--budget-s", type=float, required=True)
+    replay.add_argument("--screen-pairs", type=int, default=4)
+    replay.add_argument("--confirm-pairs", type=int, default=16)
+    replay.add_argument("--priority", action="append", default=[])
+    replay.add_argument("--expected-causes", type=Path)
+    replay.add_argument("--output", type=Path, default=Path("runs/evaluation.json"))
     args = parser.parse_args(argv)
 
     try:
         if args.command == "validate":
             load_suite(args.suite)
             print(f"Validated suite {args.suite}")
+            return 0
+        if args.command == "evaluate":
+            causes = {}
+            if args.expected_causes is not None:
+                causes = json.loads(args.expected_causes.read_text(encoding="utf-8"))
+                if not isinstance(causes, dict) or not all(
+                    isinstance(cause, str) and cause for cause in causes.values()
+                ):
+                    raise ValueError(
+                        "diagnosis expectations must map case IDs to cause strings"
+                    )
+            print(
+                evaluate(
+                    args.reference,
+                    args.observations,
+                    args.output,
+                    args.budget_s,
+                    args.screen_pairs,
+                    args.confirm_pairs,
+                    set(args.priority),
+                    causes,
+                )
+            )
             return 0
         if args.command == "run":
             ceiling = (args.bandwidth_run, args.fp32_peak_gflops, args.peak_source)
