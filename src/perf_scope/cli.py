@@ -4,6 +4,7 @@ import math
 import sys
 from pathlib import Path
 
+from perf_scope.campaign import capture_campaign
 from perf_scope.config import load_suite
 from perf_scope.profiling import profile_run
 from perf_scope.regression import analyze_run
@@ -11,6 +12,14 @@ from perf_scope.report import render_report
 from perf_scope.roofline import write_roofline
 from perf_scope.runner import run_suite
 from perf_scope.scheduler import evaluate
+
+
+def _replay_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--budget-s", type=float, required=True)
+    parser.add_argument("--screen-pairs", type=int, default=4)
+    parser.add_argument("--confirm-pairs", type=int, default=16)
+    parser.add_argument("--priority", action="append", default=[])
+    parser.add_argument("--expected-causes", type=Path)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -38,12 +47,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     replay.add_argument("reference", type=Path)
     replay.add_argument("observations", type=Path)
-    replay.add_argument("--budget-s", type=float, required=True)
-    replay.add_argument("--screen-pairs", type=int, default=4)
-    replay.add_argument("--confirm-pairs", type=int, default=16)
-    replay.add_argument("--priority", action="append", default=[])
-    replay.add_argument("--expected-causes", type=Path)
+    _replay_options(replay)
     replay.add_argument("--output", type=Path, default=Path("runs/evaluation.json"))
+    campaign = commands.add_parser(
+        "campaign", help="capture and replay a regression experiment"
+    )
+    campaign.add_argument("suite", type=Path)
+    campaign.add_argument("--reference-pairs", type=int, default=48)
+    campaign.add_argument("--observation-pairs", type=int, default=20)
+    campaign.add_argument("--output", type=Path, default=Path("runs"))
+    _replay_options(campaign)
     args = parser.parse_args(argv)
 
     try:
@@ -51,7 +64,7 @@ def main(argv: list[str] | None = None) -> int:
             load_suite(args.suite)
             print(f"Validated suite {args.suite}")
             return 0
-        if args.command == "evaluate":
+        if args.command in ("evaluate", "campaign"):
             causes = {}
             if args.expected_causes is not None:
                 causes = json.loads(args.expected_causes.read_text(encoding="utf-8"))
@@ -61,18 +74,26 @@ def main(argv: list[str] | None = None) -> int:
                     raise ValueError(
                         "diagnosis expectations must map case IDs to cause strings"
                     )
-            print(
-                evaluate(
-                    args.reference,
-                    args.observations,
-                    args.output,
-                    args.budget_s,
-                    args.screen_pairs,
-                    args.confirm_pairs,
-                    set(args.priority),
-                    causes,
-                )
+            options = (
+                args.budget_s,
+                args.screen_pairs,
+                args.confirm_pairs,
+                set(args.priority),
+                causes,
             )
+            if args.command == "evaluate":
+                result = evaluate(
+                    args.reference, args.observations, args.output, *options
+                )
+            else:
+                result = capture_campaign(
+                    args.suite,
+                    args.output,
+                    *options,
+                    reference_pairs=args.reference_pairs,
+                    observation_pairs=args.observation_pairs,
+                )
+            print(result)
             return 0
         if args.command == "run":
             ceiling = (args.bandwidth_run, args.fp32_peak_gflops, args.peak_source)

@@ -1,0 +1,4 @@
+{
+  "transpose-reverted": "increased global store sector traffic",
+  "softmax-unfusing": "increased CUDA kernel launches"
+}

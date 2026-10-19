@@ -1,0 +1,57 @@
+version = 1
+seed = 42
+pairs = 20
+warmups = 8
+iterations = 30
+
+[[cases]]
+id = "transpose-reverted"
+workload = "transpose"
+shape = [4096, 4096]
+
+[cases.baseline]
+id = "tiled"
+command = ["./build/cuda/perf-scope-cuda", "transpose", "tiled"]
+
+[cases.candidate]
+id = "naive"
+command = ["./build/cuda/perf-scope-cuda", "transpose", "naive"]
+
+[[cases]]
+id = "transpose-control"
+workload = "transpose"
+shape = [2049, 2053]
+
+[cases.baseline]
+id = "trial-a"
+command = ["./build/cuda/perf-scope-cuda", "transpose", "tiled"]
+
+[cases.candidate]
+id = "trial-b"
+command = ["./build/cuda/perf-scope-cuda", "transpose", "tiled"]
+
+[[cases]]
+id = "softmax-unfusing"
+workload = "softmax"
+shape = [128, 259]
+
+[cases.baseline]
+id = "fused"
+command = ["./build/cuda/perf-scope-cuda", "softmax", "fused"]
+
+[cases.candidate]
+id = "multi-pass"
+command = ["./build/cuda/perf-scope-cuda", "softmax", "multi-pass"]
+
+[[cases]]
+id = "softmax-control"
+workload = "softmax"
+shape = [128, 259]
+
+[cases.baseline]
+id = "trial-a"
+command = ["./build/cuda/perf-scope-cuda", "softmax", "fused"]
+
+[cases.candidate]
+id = "trial-b"
+command = ["./build/cuda/perf-scope-cuda", "softmax", "fused"]

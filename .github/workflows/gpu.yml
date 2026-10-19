@@ -1,0 +1,39 @@
+name: GPU experiment
+
+on:
+  workflow_dispatch:
+    inputs:
+      budget_s:
+        description: Replay budget in GPU subprocess seconds
+        type: number
+        default: 60
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-scope-gpu
+
+jobs:
+  campaign:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, linux, nvidia-gpu]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python -m pip install .
+      - run: cmake -S cuda -B build/cuda -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build/cuda --parallel 2
+      - run: ctest --test-dir build/cuda -L gpu --output-on-failure
+      - run: perf-scope campaign configs/regressions.toml --budget-s "$BUDGET_S" --expected-causes configs/regression-causes.json
+        env:
+          BUDGET_S: ${{ inputs.budget_s }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: perf-scope-campaign
+          path: runs/campaign-*

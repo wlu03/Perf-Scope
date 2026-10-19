@@ -80,6 +80,15 @@ perf-scope run configs/stream.toml --profile off
 
 ## Budgeted regression evaluation
 
+Capture the seeded transpose and softmax changes and their A/A controls on an exclusive GPU. The campaign measures an observation run and a longer independent reference run, then replays the budgeted policies. Set the replay budget from pilot subprocess costs.
+
+~~~bash
+perf-scope campaign configs/regressions.toml --budget-s 60 \
+  --expected-causes configs/regression-causes.json
+~~~
+
+The GPU experiment workflow runs the same command after GPU correctness tests on a self-hosted Linux runner labeled `nvidia-gpu`. It uploads run artifacts and can be dispatched from `main`.
+
 Replay three policies using independently recorded reference and observation runs from the same suite and GPU. Use more pairs in the reference run for labels. The observation run provides disjoint screening and confirmation windows and can capture profile costs with `--profile all`.
 
 ~~~bash
