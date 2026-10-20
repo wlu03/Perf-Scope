@@ -1,4 +1,6 @@
 import json
+import math
+import statistics
 from html import escape
 from pathlib import Path
 
@@ -41,6 +43,55 @@ def _profile_section(directory: Path) -> str:
     elif (directory / "roofline.json").is_file():
         sections.append('<p><a href="roofline.json">Roofline data availability</a></p>')
     return "".join(sections)
+
+
+def _secondary_section(directory: Path, comparisons: list[Comparison]) -> str:
+    labels = {
+        "bandwidth_gb_s": "Effective bandwidth (GB/s)",
+        "gflops": "Useful GFLOP/s",
+        "items_s": "Items/s",
+        "first_call_ms": "First call (ms)",
+        "peak_allocated_bytes": "Peak allocated (bytes)",
+    }
+    available = {row.case: row.metric for row in comparisons if row.device is not None}
+    values: dict[tuple[str, str], dict[str, list[float]]] = {}
+    with (directory / "measurements.jsonl").open(encoding="utf-8") as stream:
+        for line in stream:
+            row = json.loads(line)
+            case = row["case"]
+            if row["status"] != "ok" or case not in available:
+                continue
+            metrics = row.get("measurement", {}).get("metrics", {})
+            for key, value in metrics.items():
+                if (
+                    key in labels
+                    and key != available[case]
+                    and type(value) in (int, float)
+                    and math.isfinite(value)
+                ):
+                    sides = values.setdefault(
+                        (case, key), {"baseline": [], "candidate": []}
+                    )
+                    sides[row["side"]].append(value)
+    if not values:
+        return ""
+    rows = []
+    for (case, key), sides in sorted(values.items()):
+        cells = [case, labels[key]]
+        cells.extend(
+            _number(statistics.median(observations)) if observations else "—"
+            for observations in (sides["baseline"], sides["candidate"])
+        )
+        rows.append(
+            "<tr>" + "".join(f"<td>{escape(cell)}</td>" for cell in cells) + "</tr>"
+        )
+    return (
+        '<h2>Additional metrics</h2><table><thead><tr><th scope="col">Case</th>'
+        '<th scope="col">Metric</th><th scope="col">Baseline median</th>'
+        '<th scope="col">Candidate median</th></tr></thead><tbody>'
+        + "".join(rows)
+        + "</tbody></table>"
+    )
 
 
 def render_report(
@@ -103,6 +154,7 @@ th, td {{ padding: .5rem; border-bottom: 1px solid #aaa; }}
 <table><thead><tr>{headers}</tr></thead><tbody>{"".join(rows)}</tbody></table>
 <p><a href="manifest.json">Manifest</a> · <a href="measurements.jsonl">Measurements</a>
  · <a href="comparisons.json">Decisions</a></p>
+{_secondary_section(directory, comparisons)}
 {_profile_section(directory)}
 </html>
 """

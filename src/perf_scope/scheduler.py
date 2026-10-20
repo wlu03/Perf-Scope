@@ -218,6 +218,16 @@ def evaluate(
     evaluation_meta, evaluation, observations = read_run(evaluation_path)
     if reference_meta.get("started_at") == evaluation_meta.get("started_at"):
         raise ValueError("reference and evaluation must come from independent runs")
+    reference_programs = reference_meta.get("executables")
+    evaluation_programs = evaluation_meta.get("executables")
+    if (
+        reference_programs is not None
+        and evaluation_programs is not None
+        and reference_programs != evaluation_programs
+    ):
+        raise ValueError(
+            "reference and evaluation runs used different executable identities"
+        )
     if replace(reference, pairs=evaluation.pairs) != evaluation:
         raise ValueError(
             "reference and evaluation suites may differ only in pair count"

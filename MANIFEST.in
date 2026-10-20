@@ -1,0 +1,4 @@
+graft configs
+graft cuda
+graft tests
+global-exclude *.py[cod]

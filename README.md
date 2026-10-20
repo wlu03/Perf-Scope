@@ -1,6 +1,6 @@
 # Perf-Scope
 
-Perf-Scope measures paired benchmark variants and estimates whether performance changed beyond a configured slowdown margin. A run records the suite, subprocess output, raw timings, and a static report.
+Perf-Scope benchmarks CUDA kernels, ResNet-50 inference, and NVIDIA STREAM. It detects paired slowdowns, profiles confirmed CUDA regressions, and replays screening policies under a GPU-time budget.
 
 ## Install
 
@@ -10,21 +10,15 @@ python3.12 -m venv .venv
 python -m pip install .
 ~~~
 
-## Usage
+## Run artifacts
 
-~~~bash
-perf-scope validate suite.toml
-run_dir=$(perf-scope run suite.toml --fail-on-regression)
-perf-scope compare "$run_dir"
-~~~
-
-A suite is a version 1 TOML file with cases that declare a shape, a metric, and baseline and candidate argument arrays. Each subprocess writes a JSON result containing the device identifier, correctness status, and metrics. Run the command from the directory the argument arrays use for relative paths.
+A suite declares cases, shapes, primary metrics, and baseline and candidate argument arrays. Run from the checkout root. The manifest records the resolved suite, Git revision, and executable hashes. Each run saves the JSONL samples, raw subprocess logs, and `report.html`. Use `perf-scope compare` with a run directory to regenerate decisions and the report.
 
 Each pair runs both variants in seeded order. Given at least eight pairs, the comparison bootstraps whole pairs to estimate a 95% percentile interval around median relative slowdown. The default margin is 5%, controlled by `slowdown_margin`. Invalid runs exit with status 1. With `--fail-on-regression`, a confirmed slowdown exits with status 3.
 
 ## CUDA benchmarks
 
-Build on Linux with the CUDA toolkit and CMake 3.24 or later. The default build targets compute capability 8.0. Set `CMAKE_CUDA_ARCHITECTURES` for the target GPU.
+Build on Linux with the CUDA toolkit and CMake 3.24 or later. Set `-DCMAKE_CUDA_ARCHITECTURES` for the target GPU. The default is 80.
 
 ~~~bash
 cmake -S cuda -B build/cuda -DCMAKE_BUILD_TYPE=Release
@@ -97,3 +91,14 @@ perf-scope evaluate "$reference_run" "$observation_run" --budget-s "$budget_seco
 ~~~
 
 Exhaustive testing confirms every case. The fixed-budget policy confirms cases in seeded random order. The adaptive policy spends up to 25% of its budget on screening and ranks cases by declared priority, observed slowdown, and screening variability. All three use the same fixed-size confirmation window and charge recorded profiler time after detections. The JSON reports recall, false positives, detection time, diagnosis accuracy, and replayed subprocess wall time.
+
+## Local checks
+
+~~~bash
+python -m pip install '.[dev]'
+ruff check .
+python -m unittest discover -s tests -v
+python -m build
+~~~
+
+CPU fixtures exercise the CLI, reports, and replay logic. GPU correctness, counter collection, and performance measurements require a CUDA runner.

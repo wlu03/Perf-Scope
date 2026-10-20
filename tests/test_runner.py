@@ -63,6 +63,7 @@ command = {candidate_argv}
         self.assertEqual(decisions["source"], "fixture")
         self.assertEqual(decisions["comparisons"][0]["status"], "regression")
         self.assertIn("<strong>fixture</strong>", (output / "report.html").read_text())
+        self.assertIn("Items/s", (output / "report.html").read_text())
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(main(["compare", str(output), "--fail-on-regression"]), 3)
         self.assertEqual(
@@ -74,6 +75,7 @@ command = {candidate_argv}
         self.assertEqual(status, 0)
         self.assertEqual(manifest["status"], "complete")
         self.assertEqual(manifest["source"], "fixture")
+        self.assertEqual(len(manifest["executables"][sys.executable]["sha256"]), 64)
         first_sides = [row["side"] for row in rows if row["order"] == 0]
         self.assertEqual(first_sides.count("baseline"), 2)
         self.assertEqual(len(rows), 8)

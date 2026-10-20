@@ -1,8 +1,11 @@
+import hashlib
 import json
 import math
 import os
 import platform
 import random
+import shutil
+import signal
 import subprocess
 import tempfile
 import time
@@ -48,6 +51,58 @@ def _revision() -> dict:
     except (OSError, subprocess.SubprocessError):
         return {"commit": None, "dirty": None}
     return {"commit": commit, "dirty": bool(changes)}
+
+
+def _executables(suite: Suite) -> dict:
+    programs = {}
+    for case in suite.cases:
+        for variant in (case.baseline, case.candidate):
+            name = variant.command[0]
+            if name in programs:
+                continue
+            located = shutil.which(name)
+            if located is None:
+                programs[name] = {"path": None, "sha256": None}
+                continue
+            path = Path(located).resolve()
+            try:
+                with path.open("rb") as stream:
+                    digest = hashlib.file_digest(stream, "sha256").hexdigest()
+            except OSError:
+                digest = None
+            programs[name] = {"path": str(path), "sha256": digest}
+    return programs
+
+
+def run_command(
+    argv: list[str],
+    *,
+    timeout: int,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess:
+    separate_group = os.name == "posix"
+    with subprocess.Popen(
+        argv,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        encoding="utf-8",
+        errors="replace",
+        start_new_session=separate_group,
+        env=env,
+    ) as child:
+        try:
+            stdout, stderr = child.communicate(timeout=timeout)
+        except (subprocess.TimeoutExpired, KeyboardInterrupt):
+            if separate_group:
+                try:
+                    os.killpg(child.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            else:
+                child.kill()
+            raise
+        return subprocess.CompletedProcess(argv, child.returncode, stdout, stderr)
 
 
 def write_json(path: Path, value: object) -> None:
@@ -103,13 +158,7 @@ def _invoke(
         "iterations": suite.iterations,
     }
     try:
-        process = subprocess.run(
-            argv,
-            capture_output=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=suite.timeout_s,
-        )
+        process = run_command(argv, timeout=suite.timeout_s)
         stdout, stderr = process.stdout, process.stderr
     except subprocess.TimeoutExpired as error:
         stdout, stderr = _text(error.stdout), _text(error.stderr)
@@ -166,6 +215,7 @@ def run_suite(suite: Suite, source: Path, output: Path) -> tuple[Path, int]:
         "suite": asdict(suite),
         "started_at": started.isoformat(),
         "revision": _revision(),
+        "executables": _executables(suite),
         "host": {
             "os": platform.system(),
             "machine": platform.machine(),

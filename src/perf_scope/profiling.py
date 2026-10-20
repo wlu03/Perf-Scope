@@ -12,7 +12,7 @@ from pathlib import Path
 
 from perf_scope.config import Case, Suite, Variant
 from perf_scope.regression import Comparison
-from perf_scope.runner import _text, command_for, write_json
+from perf_scope.runner import _text, command_for, run_command, write_json
 
 TIME = "gpu__time_duration.sum"
 READS = "dram__bytes_read.sum"
@@ -149,11 +149,8 @@ def _collect(
     started = time.monotonic()
     stdout = stderr = ""
     try:
-        completed = subprocess.run(
+        completed = run_command(
             command,
-            capture_output=True,
-            encoding="utf-8",
-            errors="replace",
             timeout=max(suite.timeout_s, 120),
             env={**os.environ, "LC_ALL": "C"},
         )
@@ -256,11 +253,8 @@ def _trace_softmax(
     started = time.monotonic()
     stdout = stderr = ""
     try:
-        capture = subprocess.run(
+        capture = run_command(
             command,
-            capture_output=True,
-            encoding="utf-8",
-            errors="replace",
             timeout=max(suite.timeout_s, 120),
             env={**os.environ, "LC_ALL": "C"},
         )
@@ -269,11 +263,8 @@ def _trace_softmax(
             raise ValueError(f"nsys capture failed with status {capture.returncode}")
         if _device_from_output(stdout + "\n" + stderr) != expected_device:
             raise ValueError("trace target did not validate on the measured device")
-        stats = subprocess.run(
+        stats = run_command(
             stats_command,
-            capture_output=True,
-            encoding="utf-8",
-            errors="replace",
             timeout=120,
             env={**os.environ, "LC_ALL": "C"},
         )
