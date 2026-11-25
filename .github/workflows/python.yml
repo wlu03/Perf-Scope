@@ -1,0 +1,22 @@
+name: Python
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python -m pip install '.[dev]'
+      - run: ruff check .
+      - run: python -m unittest discover -s tests -v
+      - run: python -m build
